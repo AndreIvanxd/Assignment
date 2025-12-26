@@ -65,6 +65,12 @@ public class LibraryService {
     String nextMember =
         entity.getReservationQueue().isEmpty() ? null : entity.getReservationQueue().get(0);
     bookRepository.save(entity);
+//    Returning a book must HAND it to the next eligible reserver in order. Does this mean he will automatically reserve the book
+//    OR is he just the only one who can reserve it? Currently, will  automatically reserve.
+    if (nextMember != null) {
+      borrowBook(bookId, nextMember);
+
+    }
     return ResultWithNext.success(nextMember);
 
   }
@@ -77,10 +83,18 @@ public class LibraryService {
     if (!memberRepository.existsById(memberId)) {
       return Result.failure("MEMBER_NOT_FOUND");
     }
-    if (!book.get().getReservationQueue().isEmpty() && book.get().getReservationQueue().contains(memberId)){
+    if (!(book.get().getReservationQueue() == null)){
+      if (book.get().getReservationQueue().contains(memberId))  {
         return Result.failure("BOOK_ALREADY_RESERVED_BY_MEMBER");
+    }}
+
+    if (book.get().getLoanedTo() != null) {
+      if (book.get().getLoanedTo().equals(memberId)) {
+        return Result.failure("BOOK_ALREADY_LOANED");
+      }
     }
-    if (book.get().getReservationQueue().isEmpty() & canMemberBorrow(memberId) & book.get().getLoanedTo() == null) {
+
+    if (book.get().getReservationQueue().isEmpty() && canMemberBorrow(memberId) && book.get().getLoanedTo() == null) {
         Book entity = book.get();
         entity.setLoanedTo(memberId);
         entity.setDueDate(LocalDate.now().plusDays(DEFAULT_LOAN_DAYS));
@@ -111,13 +125,11 @@ public class LibraryService {
     bookRepository.save(entity);
     return Result.success();
   }
-  // Open to dilemma if this is actually more effective. On one hand it is faster but at the cost of space.
   public boolean canMemberBorrow(String memberId) {
     if (!memberRepository.existsById(memberId)) {
       return false;
     }
     int active = bookRepository.countByLoanedTo(memberId);
-    System.out.println(active);
     return active < MAX_LOANS;
   }
 
