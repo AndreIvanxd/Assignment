@@ -35,7 +35,8 @@ public class LibraryService {
     if (book.get().getLoanedTo() != null) {
       return Result.failure("BOOK_ALREADY_LOANED");
     }
-    if (!book.get().getReservationQueue().isEmpty() && !book.get().getReservationQueue().getFirst().equals(memberId)) {
+    if (!book.get().getReservationQueue().isEmpty()
+        && !book.get().getReservationQueue().getFirst().equals(memberId)) {
       return Result.failure("BOOK_ALREADY_RESERVED");
     }
     Book entity = book.get();
@@ -47,7 +48,6 @@ public class LibraryService {
     bookRepository.save(entity);
     return Result.success();
   }
-
 
   // Frontend service DOES NOT send the memberid with the request. Changed it so it does.
   public ResultWithNext returnBook(String bookId, String memberId) {
@@ -65,14 +65,13 @@ public class LibraryService {
     String nextMember =
         entity.getReservationQueue().isEmpty() ? null : entity.getReservationQueue().get(0);
     bookRepository.save(entity);
-//    Returning a book must HAND it to the next eligible reserver in order. Does this mean he will automatically reserve the book
-//    OR is he just the only one who can reserve it? Currently, will  automatically reserve.
+    //    Returning a book must HAND it to the next eligible reserver in order. Does this mean he
+    // will automatically reserve the book
+    //    OR is he just the only one who can reserve it? Currently, will  automatically reserve.
     if (nextMember != null) {
       borrowBook(bookId, nextMember);
-
     }
     return ResultWithNext.success(nextMember);
-
   }
 
   public Result reserveBook(String bookId, String memberId) {
@@ -83,10 +82,11 @@ public class LibraryService {
     if (!memberRepository.existsById(memberId)) {
       return Result.failure("MEMBER_NOT_FOUND");
     }
-    if (!(book.get().getReservationQueue() == null)){
-      if (book.get().getReservationQueue().contains(memberId))  {
+    if (!(book.get().getReservationQueue() == null)) {
+      if (book.get().getReservationQueue().contains(memberId)) {
         return Result.failure("BOOK_ALREADY_RESERVED_BY_MEMBER");
-    }}
+      }
+    }
 
     if (book.get().getLoanedTo() != null) {
       if (book.get().getLoanedTo().equals(memberId)) {
@@ -94,12 +94,14 @@ public class LibraryService {
       }
     }
 
-    if (book.get().getReservationQueue().isEmpty() && canMemberBorrow(memberId) && book.get().getLoanedTo() == null) {
-        Book entity = book.get();
-        entity.setLoanedTo(memberId);
-        entity.setDueDate(LocalDate.now().plusDays(DEFAULT_LOAN_DAYS));
-        bookRepository.save(entity);
-        return Result.success();
+    if (book.get().getReservationQueue().isEmpty()
+        && canMemberBorrow(memberId)
+        && book.get().getLoanedTo() == null) {
+      Book entity = book.get();
+      entity.setLoanedTo(memberId);
+      entity.setDueDate(LocalDate.now().plusDays(DEFAULT_LOAN_DAYS));
+      bookRepository.save(entity);
+      return Result.success();
     }
 
     Book entity = book.get();
@@ -125,6 +127,7 @@ public class LibraryService {
     bookRepository.save(entity);
     return Result.success();
   }
+
   public boolean canMemberBorrow(String memberId) {
     if (!memberRepository.existsById(memberId)) {
       return false;

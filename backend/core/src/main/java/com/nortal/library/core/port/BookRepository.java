@@ -14,6 +14,6 @@ public interface BookRepository {
   void delete(Book book);
 
   boolean existsById(String id);
-  int countByLoanedTo(String loanedTo);
 
+  int countByLoanedTo(String loanedTo);
 }

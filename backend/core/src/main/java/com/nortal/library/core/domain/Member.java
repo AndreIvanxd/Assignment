@@ -20,7 +20,6 @@ public class Member {
   @Column(nullable = false)
   private String name;
 
-
   public Member(String id, String name) {
     this.id = id;
     this.name = name;
