@@ -35,10 +35,15 @@ public class LibraryService {
     if (book.get().getLoanedTo() != null) {
       return Result.failure("BOOK_ALREADY_LOANED");
     }
+    //    "If a reservation queue exists, only the head of the queue should receive the book (no
+    // line-jumping via direct borrow)."
+    //    I will assume that means that the person in line when #1 in queue isn't eligible cant
+    // borrow the book.
     if (!book.get().getReservationQueue().isEmpty()
         && !book.get().getReservationQueue().getFirst().equals(memberId)) {
       return Result.failure("BOOK_ALREADY_RESERVED");
     }
+
     Book entity = book.get();
     entity.setLoanedTo(memberId);
     entity.setDueDate(LocalDate.now().plusDays(DEFAULT_LOAN_DAYS));
@@ -67,9 +72,21 @@ public class LibraryService {
     bookRepository.save(entity);
     //    Returning a book must HAND it to the next eligible reserver in order. Does this mean he
     // will automatically reserve the book
-    //    OR is he just the only one who can reserve it? Currently, will  automatically reserve.
+    //    OR is he just the only one who can reserve it? Currently, will  automatically reserve it
+    // for him.
     if (nextMember != null) {
-      borrowBook(bookId, nextMember);
+      for (int i = 0; i < book.get().getReservationQueue().size(); i++) {
+        if (canMemberBorrow(book.get().getReservationQueue().get(i))) {
+          memberId = book.get().getReservationQueue().get(i);
+          entity.setLoanedTo(memberId);
+          entity.setDueDate(LocalDate.now().plusDays(DEFAULT_LOAN_DAYS));
+          if (!book.get().getReservationQueue().isEmpty()) {
+            entity.getReservationQueue().remove(memberId);
+          }
+          bookRepository.save(entity);
+          return ResultWithNext.success(book.get().getReservationQueue().get(i));
+        }
+      }
     }
     return ResultWithNext.success(nextMember);
   }
@@ -82,7 +99,7 @@ public class LibraryService {
     if (!memberRepository.existsById(memberId)) {
       return Result.failure("MEMBER_NOT_FOUND");
     }
-    if (!(book.get().getReservationQueue() == null)) {
+    if (book.get().getReservationQueue() != null) {
       if (book.get().getReservationQueue().contains(memberId)) {
         return Result.failure("BOOK_ALREADY_RESERVED_BY_MEMBER");
       }
