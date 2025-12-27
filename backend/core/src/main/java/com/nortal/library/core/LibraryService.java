@@ -33,30 +33,25 @@ public class LibraryService {
       return Result.failure("BORROW_LIMIT");
     }
     if (book.get().getLoanedTo() != null) {
-      return Result.failure("BOOK_ALREADY_LOANED");
+      return Result.failure("BOOK_LOANED");
     }
-    //     Returning a book must HAND it to the next eligible reserver in order.
-    //    I will assume this also means that the next person in line when #1 in queue isn't eligible can
-    // borrow the book.
-    if (!book.get().getReservationQueue().isEmpty()){
-
-      boolean queueNoEligibleMembers = book.get().getReservationQueue().stream().anyMatch(this::canMemberBorrow);
-      if (queueNoEligibleMembers) {
-       return Result.failure("NOT_ELIGIBLE");
-      }
+    if (!book.get().getReservationQueue().isEmpty()
+        && !(book.get().getReservationQueue().getFirst().equals(memberId))) {
+      return Result.failure("BOOK_RESERVED");
     }
 
     Book entity = book.get();
     entity.setLoanedTo(memberId);
     entity.setDueDate(LocalDate.now().plusDays(DEFAULT_LOAN_DAYS));
-    if (!book.get().getReservationQueue().isEmpty()) {
+    if (!book.get().getReservationQueue().isEmpty()
+        && book.get().getLoanedTo().contains(memberId)) {
       entity.getReservationQueue().remove(memberId);
     }
     bookRepository.save(entity);
     return Result.success();
   }
 
-  // Frontend service DOES NOT send the memberid with the request. Changed it so it does.
+  // Frontend service does not send the memberID with the request. Changed it so it does.
   public ResultWithNext returnBook(String bookId, String memberId) {
     Optional<Book> book = bookRepository.findById(bookId);
     if (book.isEmpty()) {
@@ -65,25 +60,20 @@ public class LibraryService {
     if (!book.get().getLoanedTo().equals(memberId)) {
       return ResultWithNext.failure();
     }
-
     Book entity = book.get();
     entity.setLoanedTo(null);
     entity.setDueDate(null);
     String nextMember =
         entity.getReservationQueue().isEmpty() ? null : entity.getReservationQueue().get(0);
     bookRepository.save(entity);
-    //    Returning a book must HAND it to the next eligible reserver in order. Does this mean he
-    // will automatically borrow the book OR is he just the only one who can borrow it? Currently, will  automatically borrow it
-    // for him.
+    //   Loan it to next eligible member
     if (nextMember != null) {
       for (int i = 0; i < book.get().getReservationQueue().size(); i++) {
-        if (canMemberBorrow(book.get().getReservationQueue().get(i))) {
-          memberId = book.get().getReservationQueue().get(i);
+        memberId = book.get().getReservationQueue().get(i);
+        if (canMemberBorrow(memberId) && memberRepository.existsById(memberId)) {
           entity.setLoanedTo(memberId);
           entity.setDueDate(LocalDate.now().plusDays(DEFAULT_LOAN_DAYS));
-          if (!book.get().getReservationQueue().isEmpty()) {
-            entity.getReservationQueue().remove(memberId);
-          }
+          entity.getReservationQueue().remove(memberId);
           bookRepository.save(entity);
           return ResultWithNext.success(book.get().getReservationQueue().get(i));
         }
@@ -97,18 +87,19 @@ public class LibraryService {
     if (book.isEmpty()) {
       return Result.failure("BOOK_NOT_FOUND");
     }
+
     if (!memberRepository.existsById(memberId)) {
       return Result.failure("MEMBER_NOT_FOUND");
     }
-    if (book.get().getReservationQueue() != null && book.get().getReservationQueue().contains(memberId)) {
-        return Result.failure("BOOK_ALREADY_RESERVED_BY_MEMBER");
-      }
 
+    if (book.get().getReservationQueue() != null
+        && book.get().getReservationQueue().contains(memberId)) {
+      return Result.failure("BOOK_ALREADY_RESERVED_BY_MEMBER");
+    }
 
     if (book.get().getLoanedTo() != null && book.get().getLoanedTo().equals(memberId)) {
-        return Result.failure("BOOK_ALREADY_LOANED_BY_MEMBER");
-      }
-
+      return Result.failure("BOOK_ALREADY_LOANED_BY_MEMBER");
+    }
 
     if (book.get().getReservationQueue().isEmpty()
         && canMemberBorrow(memberId)
@@ -118,17 +109,6 @@ public class LibraryService {
       entity.setDueDate(LocalDate.now().plusDays(DEFAULT_LOAN_DAYS));
       bookRepository.save(entity);
       return Result.success();
-    }
-    if (!book.get().getReservationQueue().isEmpty() && book.get().getLoanedTo() == null){
-
-      boolean queueNoEligibleMembers = book.get().getReservationQueue().stream().noneMatch(this::canMemberBorrow);
-      if (queueNoEligibleMembers) {
-        Book entity = book.get();
-        entity.setLoanedTo(memberId);
-        entity.setDueDate(LocalDate.now().plusDays(DEFAULT_LOAN_DAYS));
-        bookRepository.save(entity);
-        return Result.success();
-      }
     }
 
     Book entity = book.get();
