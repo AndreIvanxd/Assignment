@@ -35,13 +35,15 @@ public class LibraryService {
     if (book.get().getLoanedTo() != null) {
       return Result.failure("BOOK_ALREADY_LOANED");
     }
-    //    "If a reservation queue exists, only the head of the queue should receive the book (no
-    // line-jumping via direct borrow)."
-    //    I will assume that means that the person in line when #1 in queue isn't eligible cant
+    //     Returning a book must HAND it to the next eligible reserver in order.
+    //    I will assume this also means that the next person in line when #1 in queue isn't eligible can
     // borrow the book.
-    if (!book.get().getReservationQueue().isEmpty()
-        && !book.get().getReservationQueue().getFirst().equals(memberId)) {
-      return Result.failure("BOOK_ALREADY_RESERVED");
+    if (!book.get().getReservationQueue().isEmpty()){
+
+      boolean queueNoEligibleMembers = book.get().getReservationQueue().stream().anyMatch(this::canMemberBorrow);
+      if (queueNoEligibleMembers) {
+       return Result.failure("NOT_ELIGIBLE");
+      }
     }
 
     Book entity = book.get();
@@ -71,8 +73,7 @@ public class LibraryService {
         entity.getReservationQueue().isEmpty() ? null : entity.getReservationQueue().get(0);
     bookRepository.save(entity);
     //    Returning a book must HAND it to the next eligible reserver in order. Does this mean he
-    // will automatically reserve the book
-    //    OR is he just the only one who can reserve it? Currently, will  automatically reserve it
+    // will automatically borrow the book OR is he just the only one who can borrow it? Currently, will  automatically borrow it
     // for him.
     if (nextMember != null) {
       for (int i = 0; i < book.get().getReservationQueue().size(); i++) {
@@ -99,17 +100,15 @@ public class LibraryService {
     if (!memberRepository.existsById(memberId)) {
       return Result.failure("MEMBER_NOT_FOUND");
     }
-    if (book.get().getReservationQueue() != null) {
-      if (book.get().getReservationQueue().contains(memberId)) {
+    if (book.get().getReservationQueue() != null && book.get().getReservationQueue().contains(memberId)) {
         return Result.failure("BOOK_ALREADY_RESERVED_BY_MEMBER");
       }
-    }
 
-    if (book.get().getLoanedTo() != null) {
-      if (book.get().getLoanedTo().equals(memberId)) {
-        return Result.failure("BOOK_ALREADY_LOANED");
+
+    if (book.get().getLoanedTo() != null && book.get().getLoanedTo().equals(memberId)) {
+        return Result.failure("BOOK_ALREADY_LOANED_BY_MEMBER");
       }
-    }
+
 
     if (book.get().getReservationQueue().isEmpty()
         && canMemberBorrow(memberId)
@@ -119,6 +118,17 @@ public class LibraryService {
       entity.setDueDate(LocalDate.now().plusDays(DEFAULT_LOAN_DAYS));
       bookRepository.save(entity);
       return Result.success();
+    }
+    if (!book.get().getReservationQueue().isEmpty() && book.get().getLoanedTo() == null){
+
+      boolean queueNoEligibleMembers = book.get().getReservationQueue().stream().noneMatch(this::canMemberBorrow);
+      if (queueNoEligibleMembers) {
+        Book entity = book.get();
+        entity.setLoanedTo(memberId);
+        entity.setDueDate(LocalDate.now().plusDays(DEFAULT_LOAN_DAYS));
+        bookRepository.save(entity);
+        return Result.success();
+      }
     }
 
     Book entity = book.get();
